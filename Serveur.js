@@ -8,7 +8,7 @@
 // 3. Nouveau "Web Service" -> connecte le repo -> Build: npm install -> Start: node server.js
 // 4. Ajoute la variable d'environnement PRINTFUL_API_KEY (ta clé, trouvée dans
 //    Printful -> Paramètres -> API)
-//    Ajoute aussi KKIAPAY_PUBLIC_KEY, KKIAPAY_PRIVATE_KEY (Kkiapay -> Paramètres -> API)
+//    Ajoute aussi KKIAPAY_PUBLIC_KEY, KKIAPAY_PRIVATE_KEY, KKIAPAY_SECRET_KEY (Kkiapay -> Développeurs -> Clés API)
 //    Ajoute aussi OPENAI_API_KEY si tu veux la génération de designs par IA (facultatif)
 // 5. Ajoute aussi ALLOWED_ORIGIN = l'URL de ton appli (pour restreindre qui peut appeler ce serveur)
 // 6. Une fois déployé, remplace les URLs dans PrintPilot.jsx par l'URL de ce serveur
@@ -85,6 +85,7 @@ app.post("/api/kkiapay/verify", async (req, res) => {
       headers: {
         "x-api-key": process.env.KKIAPAY_PUBLIC_KEY,
         "x-private-key": process.env.KKIAPAY_PRIVATE_KEY,
+        "x-secret-key": process.env.KKIAPAY_SECRET_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ transactionId }),
