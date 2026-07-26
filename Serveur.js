@@ -1,18 +1,6 @@
 // server.js — Serveur relais entre ton appli et l'API Printful
 // Pourquoi ce serveur : les navigateurs bloquent les appels directs à api.printful.com
 // (CORS). Ce petit serveur fait les appels à ta place, côté serveur, où CORS ne s'applique pas.
-//
-// DÉPLOIEMENT (gratuit) :
-// 1. Crée un compte sur https://render.com (ou https://railway.app)
-// 2. Mets ce dossier dans un repo GitHub
-// 3. Nouveau "Web Service" -> connecte le repo -> Build: npm install -> Start: node server.js
-// 4. Ajoute la variable d'environnement PRINTFUL_API_KEY (ta clé, trouvée dans
-//    Printful -> Paramètres -> API)
-//    Ajoute aussi KKIAPAY_PUBLIC_KEY, KKIAPAY_PRIVATE_KEY, KKIAPAY_SECRET_KEY (Kkiapay -> Développeurs -> Clés API)
-//    Ajoute aussi OPENAI_API_KEY si tu veux la génération de designs par IA (facultatif)
-// 5. Ajoute aussi ALLOWED_ORIGIN = l'URL de ton appli (pour restreindre qui peut appeler ce serveur)
-// 6. Une fois déployé, remplace les URLs dans PrintPilot.jsx par l'URL de ce serveur
-//    (ex: https://ton-serveur.onrender.com/api/products)
 
 import express from "express";
 import cors from "cors";
@@ -35,13 +23,11 @@ function authHeaders() {
   };
 }
 
-// Lister les produits de la boutique
 app.get("/api/products", async (req, res) => {
   const r = await fetch(`${PRINTFUL_BASE}/store/products`, { headers: authHeaders() });
   res.status(r.status).json(await r.json());
 });
 
-// Créer un produit dans la boutique (design + variantes)
 app.post("/api/products", async (req, res) => {
   const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
     method: "POST",
@@ -51,14 +37,11 @@ app.post("/api/products", async (req, res) => {
   res.status(r.status).json(await r.json());
 });
 
-// Lister les commandes
 app.get("/api/orders", async (req, res) => {
   const r = await fetch(`${PRINTFUL_BASE}/orders`, { headers: authHeaders() });
   res.status(r.status).json(await r.json());
 });
 
-// Créer une commande (quand un client paie sur ta boutique, tu appelles ça
-// pour déclencher la fabrication + expédition chez Printful)
 app.post("/api/orders", async (req, res) => {
   const r = await fetch(`${PRINTFUL_BASE}/orders`, {
     method: "POST",
@@ -68,15 +51,11 @@ app.post("/api/orders", async (req, res) => {
   res.status(r.status).json(await r.json());
 });
 
-// Catalogue Printful (types de produits imprimables : t-shirts, mugs, posters...)
 app.get("/api/catalog", async (req, res) => {
   const r = await fetch(`${PRINTFUL_BASE}/products`, { headers: authHeaders() });
   res.status(r.status).json(await r.json());
 });
 
-// --- Kkiapay ---
-// Vérifie une transaction Kkiapay côté serveur (jamais faire confiance au navigateur seul)
-// Doc: https://docs.kkiapay.me
 app.post("/api/kkiapay/verify", async (req, res) => {
   const { transactionId } = req.body;
   try {
@@ -91,24 +70,17 @@ app.post("/api/kkiapay/verify", async (req, res) => {
       body: JSON.stringify({ transactionId }),
     });
     const data = await r.json();
-    // data.status === "SUCCESS" si le paiement est confirmé
     res.status(r.status).json(data);
   } catch (e) {
     res.status(500).json({ error: "verification-failed" });
   }
 });
 
-// Webhook Kkiapay (à configurer dans le dashboard Kkiapay) — c'est la vraie source de vérité,
-// plus fiable que la confirmation côté navigateur.
 app.post("/api/kkiapay/webhook", express.json(), async (req, res) => {
   console.log("Webhook Kkiapay reçu:", req.body);
-  // TODO: si le statut est SUCCESS, déclencher la création de la commande Printful
-  // via la logique de la route /api/orders ci-dessus.
   res.sendStatus(200);
 });
 
-// --- Génération d'images IA (designs produits) ---
-// Nécessite une clé API OpenAI (variable d'environnement OPENAI_API_KEY)
 app.post("/api/generate-image", async (req, res) => {
   const { prompt } = req.body;
   try {
@@ -129,6 +101,44 @@ app.post("/api/generate-image", async (req, res) => {
     res.status(r.status).json(data);
   } catch (e) {
     res.status(500).json({ error: "image-generation-failed" });
+  }
+});
+
+app.post("/api/generate-marketing", async (req, res) => {
+  const { product, audience } = req.body;
+  const prompt = `Tu es un stratège en publicité e-commerce spécialisé en print-on-demand (Printful) qui vend au Bénin/Afrique de l'Ouest et à l'international.
+Produit à vendre: ${product}
+Audience visée: ${audience || "à définir toi-même selon le produit"}
+
+Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour, avec cette structure exacte:
+{
+  "avatar_client": "paragraphe décrivant le client idéal: frustrations, désirs, habitudes",
+  "proposition_valeur": "une phrase forte",
+  "angles": ["angle 1", "angle 2", "angle 3"],
+  "hooks": ["hook court 1", "hook court 2", "hook court 3", "hook court 4", "hook court 5"],
+  "publicites": [
+    {"titre": "titre pub 1", "texte": "texte publicitaire court prêt pour Meta Ads", "cta": "call to action"},
+    {"titre": "titre pub 2", "texte": "texte publicitaire court", "cta": "call to action"}
+  ],
+  "fiche_produit": "description produit prête pour la boutique, orientée conversion"
+}`;
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      }
+    );
+    const data = await r.json();
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+    const clean = text.replace(/```json|```/g, "").trim();
+    res.status(r.status).json(JSON.parse(clean));
+  } catch (e) {
+    res.status(500).json({ error: "marketing-generation-failed" });
   }
 });
 
