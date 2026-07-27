@@ -1,6 +1,4 @@
-// server.js — Serveur relais entre ton appli et l'API Printful
-// Pourquoi ce serveur : les navigateurs bloquent les appels directs à api.printful.com
-// (CORS). Ce petit serveur fait les appels à ta place, côté serveur, où CORS ne s'applique pas.
+// server.js — Serveur relais entre ton appli et les API (Printful, Kkiapay, OpenAI, Groq)
 
 import express from "express";
 import cors from "cors";
@@ -106,14 +104,17 @@ app.post("/api/generate-image", async (req, res) => {
 
 app.post("/api/generate-marketing", async (req, res) => {
   const { product, audience } = req.body;
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: "GEMINI_API_KEY manquante sur le serveur" });
+  
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: "GROQ_API_KEY manquante sur le serveur" });
   }
-  const prompt = `Tu es un stratège en publicité e-commerce spécialisé en print-on-demand (Printful) qui vend au Bénin/Afrique de l'Ouest et à l'international.
-Produit à vendre: ${product}
+
+  const systemPrompt = "Tu es un stratège en publicité e-commerce spécialisé en print-on-demand (Printful) qui vend au Bénin/Afrique de l'Ouest et à l'international. Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour, avec la structure exacte demandée.";
+  
+  const userPrompt = `Produit à vendre: ${product}
 Audience visée: ${audience || "à définir toi-même selon le produit"}
 
-Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour, avec cette structure exacte:
+Structure JSON attendue:
 {
   "avatar_client": "paragraphe décrivant le client idéal: frustrations, désirs, habitudes",
   "proposition_valeur": "une phrase forte",
@@ -125,23 +126,33 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour, avec cette
   ],
   "fiche_produit": "description produit prête pour la boutique, orientée conversion"
 }`;
+
   try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      }
-    );
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" }
+      }),
+    });
+
     const data = await r.json();
     if (!r.ok) {
-      return res.status(500).json({ error: "gemini-api-error", details: data });
+      return res.status(500).json({ error: "groq-api-error", details: data });
     }
-    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+
+    const text = (data.choices?.[0]?.message?.content || "").trim();
     const clean = text.replace(/```json|```/g, "").trim();
+    
     try {
       const parsed = JSON.parse(clean);
       res.status(200).json(parsed);
@@ -154,4 +165,4 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour, avec cette
 });
 
 const port = process.env.PORT || 3001;
-app.listen(port, () => console.log(`Serveur relais Printful actif sur le port ${port}`));
+app.listen(port, () => console.log(`Serveur relais actif sur le port ${port}`));
