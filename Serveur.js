@@ -12,21 +12,16 @@ app.use(
 );
 
 const PRINTFUL_BASE = "https://api.printful.com";
+const HARDCODED_STORE_ID = "18530151"; // ID de ta boutique PrintPilot
 
-// Fonction d'authentification incluant obligatoirement le store_id requis par l'API
+// Fonction d'authentification avec l'ID injecté directement pour éviter tout bug de variable d'environnement
 function authHeaders() {
   const apiKey = process.env.PRINTFUL_API_KEY;
-  const storeId = process.env.PRINTFUL_STORE_ID;
-  
-  const headers = {
+  return {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
+    "X-PF-Store-Id": HARDCODED_STORE_ID,
   };
-  
-  if (storeId) {
-    headers["X-PF-Store-Id"] = storeId;
-  }
-  return headers;
 }
 
 // Liste tes boutiques Printful et leurs IDs
