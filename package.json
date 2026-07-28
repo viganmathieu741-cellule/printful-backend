@@ -2,7 +2,7 @@
   "name": "printful-backend",
   "version": "1.0.0",
   "type": "module",
-  "main": "server.js",
+  "main": "Serveur.js",
   "scripts": {
     "start": "node Serveur.js"
   },
