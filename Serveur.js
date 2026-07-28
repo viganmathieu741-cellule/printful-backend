@@ -14,12 +14,18 @@ app.use(
 const PRINTFUL_BASE = "https://api.printful.com";
 const HARDCODED_STORE_ID = "18530151"; // ID de ta boutique PrintPilot
 
-// Fonction d'authentification de base (Bearer Token uniquement)
 function authHeaders() {
   const apiKey = process.env.PRINTFUL_API_KEY;
   return {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
+  };
+}
+
+function storeHeaders() {
+  return {
+    ...authHeaders(),
+    "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || HARDCODED_STORE_ID,
   };
 }
 
@@ -43,14 +49,8 @@ app.get("/api/products", async (req, res) => {
   if (!apiKey) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
-
   try {
-    const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
-      headers: {
-        ...authHeaders(),
-        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || HARDCODED_STORE_ID,
-      },
-    });
+    const r = await fetch(`${PRINTFUL_BASE}/store/products`, { headers: storeHeaders() });
     const data = await r.json();
     const productsArray = Array.isArray(data) ? data : (data.result || []);
     res.status(200).json(productsArray);
@@ -59,20 +59,16 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// Création / Pousse d'un produit synchronisé (Corrigé sur /store/products en POST)
+// Création / envoi d'un produit synchronisé
 app.post("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
-
   try {
     const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
       method: "POST",
-      headers: {
-        ...authHeaders(),
-        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || HARDCODED_STORE_ID,
-      },
+      headers: storeHeaders(),
       body: JSON.stringify(req.body),
     });
     const data = await r.json();
@@ -86,7 +82,7 @@ app.get("/api/orders", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
-  const r = await fetch(`${PRINTFUL_BASE}/orders`, { headers: authHeaders() });
+  const r = await fetch(`${PRINTFUL_BASE}/orders`, { headers: storeHeaders() });
   res.status(r.status).json(await r.json());
 });
 
@@ -96,12 +92,13 @@ app.post("/api/orders", async (req, res) => {
   }
   const r = await fetch(`${PRINTFUL_BASE}/orders`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: storeHeaders(),
     body: JSON.stringify(req.body),
   });
   res.status(r.status).json(await r.json());
 });
 
+// Catalogue général Printful (n'a pas besoin du store_id)
 app.get("/api/catalog", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
@@ -113,6 +110,20 @@ app.get("/api/catalog", async (req, res) => {
     res.status(200).json(catalogArray);
   } catch (e) {
     res.status(500).json({ error: "catalog-fetch-failed" });
+  }
+});
+
+// Détail d'un produit du catalogue (récupère ses variantes: tailles/couleurs)
+app.get("/api/catalog/:id", async (req, res) => {
+  if (!process.env.PRINTFUL_API_KEY) {
+    return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
+  }
+  try {
+    const r = await fetch(`${PRINTFUL_BASE}/products/${req.params.id}`, { headers: authHeaders() });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(500).json({ error: "catalog-variant-fetch-failed" });
   }
 });
 
