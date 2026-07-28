@@ -32,7 +32,7 @@ app.get("/api/stores", async (req, res) => {
   res.status(r.status).json(await r.json());
 });
 
-// Récupération des produits avec l'ID directement dans l'URL
+// Récupération des produits de la boutique
 app.get("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
@@ -40,7 +40,12 @@ app.get("/api/products", async (req, res) => {
   }
 
   try {
-    const r = await fetch(`${PRINTFUL_BASE}/stores/${HARDCODED_STORE_ID}/products`, { headers: authHeaders() });
+    const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
+      headers: {
+        ...authHeaders(),
+        "X-PF-Store-Id": HARDCODED_STORE_ID,
+      },
+    });
     const data = await r.json();
     const productsArray = Array.isArray(data) ? data : (data.result || []);
     res.status(200).json(productsArray);
@@ -49,7 +54,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// Création / Pousse d'un produit avec l'ID directement dans l'URL
+// Création / Pousse d'un produit synchronisé (via l'endpoint de sync-products avec le header de store)
 app.post("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
@@ -57,9 +62,13 @@ app.post("/api/products", async (req, res) => {
   }
 
   try {
-    const r = await fetch(`${PRINTFUL_BASE}/stores/${HARDCODED_STORE_ID}/products`, {
+    // Utilisation de l'endpoint officiel de sync des produits avec le header de la boutique
+    const r = await fetch(`${PRINTFUL_BASE}/sync/products`, {
       method: "POST",
-      headers: authHeaders(),
+      headers: {
+        ...authHeaders(),
+        "X-PF-Store-Id": HARDCODED_STORE_ID,
+      },
       body: JSON.stringify(req.body),
     });
     const data = await r.json();
@@ -213,5 +222,5 @@ Structure JSON attendue:
   }
 });
 
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Serveur relais actif sur le port ${port}`));
