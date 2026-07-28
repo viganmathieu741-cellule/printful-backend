@@ -13,15 +13,18 @@ app.use(
 
 const PRINTFUL_BASE = "https://api.printful.com";
 
-// Fonction d'authentification pour les requêtes globales
+// Fonction d'authentification incluant obligatoirement le store_id dans les headers
 function authHeaders() {
   const apiKey = process.env.PRINTFUL_API_KEY;
+  const storeId = process.env.PRINTFUL_STORE_ID;
+  
   const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
   };
-  if (process.env.PRINTFUL_STORE_ID) {
-    headers["X-PF-Store-Id"] = process.env.PRINTFUL_STORE_ID;
+  
+  if (storeId) {
+    headers["X-PF-Store-Id"] = storeId;
   }
   return headers;
 }
@@ -37,22 +40,15 @@ app.get("/api/stores", async (req, res) => {
   res.status(r.status).json(await r.json());
 });
 
-// Récupération des produits de la boutique (corrigé avec l'ID direct dans l'URL)
+// Récupération des produits de la boutique via l'endpoint standard et le header X-PF-Store-Id
 app.get("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
-  const storeId = process.env.PRINTFUL_STORE_ID;
-
   if (!apiKey) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
 
   try {
-    // Si l'ID de boutique est renseigné, on tape directement sur l'URL de la boutique pour éviter le 404
-    const url = storeId 
-      ? `${PRINTFUL_BASE}/stores/${storeId}/products` 
-      : `${PRINTFUL_BASE}/store/products`;
-
-    const r = await fetch(url, { headers: authHeaders() });
+    const r = await fetch(`${PRINTFUL_BASE}/store/products`, { headers: authHeaders() });
     const data = await r.json();
     const productsArray = Array.isArray(data) ? data : (data.result || []);
     res.status(200).json(productsArray);
@@ -63,18 +59,12 @@ app.get("/api/products", async (req, res) => {
 
 app.post("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
-  const storeId = process.env.PRINTFUL_STORE_ID;
-
   if (!apiKey) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
 
   try {
-    const url = storeId 
-      ? `${PRINTFUL_BASE}/stores/${storeId}/products` 
-      : `${PRINTFUL_BASE}/store/products`;
-
-    const r = await fetch(url, {
+    const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(req.body),
