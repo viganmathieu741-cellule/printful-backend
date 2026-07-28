@@ -12,6 +12,7 @@ app.use(
 );
 
 const PRINTFUL_BASE = "https://api.printful.com";
+const HARDCODED_STORE_ID = "18530151"; // ID de ta boutique PrintPilot
 
 // Fonction d'authentification de base (Bearer Token uniquement)
 function authHeaders() {
@@ -22,7 +23,7 @@ function authHeaders() {
   };
 }
 
-// Route pour lister les boutiques et afficher l'ID directement dans le navigateur
+// Liste tes boutiques Printful
 app.get("/api/stores", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "PRINTFUL_API_KEY manquante sur le serveur" });
@@ -47,7 +48,7 @@ app.get("/api/products", async (req, res) => {
     const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
       headers: {
         ...authHeaders(),
-        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || "18530151",
+        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || HARDCODED_STORE_ID,
       },
     });
     const data = await r.json();
@@ -58,7 +59,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// Création / Pousse d'un produit synchronisé
+// Création / Pousse d'un produit synchronisé (Corrigé sur /store/products en POST)
 app.post("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
@@ -66,11 +67,11 @@ app.post("/api/products", async (req, res) => {
   }
 
   try {
-    const r = await fetch(`${PRINTFUL_BASE}/sync/products`, {
+    const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
       method: "POST",
       headers: {
         ...authHeaders(),
-        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || "18530151",
+        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || HARDCODED_STORE_ID,
       },
       body: JSON.stringify(req.body),
     });
