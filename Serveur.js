@@ -12,7 +12,6 @@ app.use(
 );
 
 const PRINTFUL_BASE = "https://api.printful.com";
-const HARDCODED_STORE_ID = "18530151"; // ID de ta boutique PrintPilot
 
 // Fonction d'authentification de base (Bearer Token uniquement)
 function authHeaders() {
@@ -23,13 +22,18 @@ function authHeaders() {
   };
 }
 
-// Liste tes boutiques Printful et leurs IDs
+// Route pour lister les boutiques et afficher l'ID directement dans le navigateur
 app.get("/api/stores", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "PRINTFUL_API_KEY manquante sur le serveur" });
   }
-  const r = await fetch(`${PRINTFUL_BASE}/stores`, { headers: authHeaders() });
-  res.status(r.status).json(await r.json());
+  try {
+    const r = await fetch(`${PRINTFUL_BASE}/stores`, { headers: authHeaders() });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(500).json({ error: "stores-fetch-failed", details: e.message });
+  }
 });
 
 // Récupération des produits de la boutique
@@ -43,7 +47,7 @@ app.get("/api/products", async (req, res) => {
     const r = await fetch(`${PRINTFUL_BASE}/store/products`, {
       headers: {
         ...authHeaders(),
-        "X-PF-Store-Id": HARDCODED_STORE_ID,
+        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || "18530151",
       },
     });
     const data = await r.json();
@@ -54,7 +58,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// Création / Pousse d'un produit synchronisé (via l'endpoint de sync-products avec le header de store)
+// Création / Pousse d'un produit synchronisé
 app.post("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
@@ -62,12 +66,11 @@ app.post("/api/products", async (req, res) => {
   }
 
   try {
-    // Utilisation de l'endpoint officiel de sync des produits avec le header de la boutique
     const r = await fetch(`${PRINTFUL_BASE}/sync/products`, {
       method: "POST",
       headers: {
         ...authHeaders(),
-        "X-PF-Store-Id": HARDCODED_STORE_ID,
+        "X-PF-Store-Id": process.env.PRINTFUL_STORE_ID || "18530151",
       },
       body: JSON.stringify(req.body),
     });
