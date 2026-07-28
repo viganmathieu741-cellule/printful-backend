@@ -13,20 +13,13 @@ app.use(
 
 const PRINTFUL_BASE = "https://api.printful.com";
 
-// Fonction d'authentification incluant obligatoirement le store_id dans les headers
+// Fonction d'authentification simple basée uniquement sur le Bearer Token (sans header store_id bloquant)
 function authHeaders() {
   const apiKey = process.env.PRINTFUL_API_KEY;
-  const storeId = process.env.PRINTFUL_STORE_ID;
-  
-  const headers = {
+  return {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
   };
-  
-  if (storeId) {
-    headers["X-PF-Store-Id"] = storeId;
-  }
-  return headers;
 }
 
 // Liste tes boutiques Printful et leurs IDs
@@ -34,13 +27,11 @@ app.get("/api/stores", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "PRINTFUL_API_KEY manquante sur le serveur" });
   }
-  const r = await fetch(`${PRINTFUL_BASE}/stores`, {
-    headers: { Authorization: `Bearer ${process.env.PRINTFUL_API_KEY}`, "Content-Type": "application/json" },
-  });
+  const r = await fetch(`${PRINTFUL_BASE}/stores`, { headers: authHeaders() });
   res.status(r.status).json(await r.json());
 });
 
-// Récupération des produits de la boutique via l'endpoint standard et le header X-PF-Store-Id
+// Récupération des produits de la boutique
 app.get("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
@@ -57,6 +48,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
+// Création / Pousse d'un produit vers Printful
 app.post("/api/products", async (req, res) => {
   const apiKey = process.env.PRINTFUL_API_KEY;
   if (!apiKey) {
@@ -101,9 +93,7 @@ app.get("/api/catalog", async (req, res) => {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
   try {
-    const r = await fetch(`${PRINTFUL_BASE}/products`, {
-      headers: { Authorization: `Bearer ${process.env.PRINTFUL_API_KEY}`, "Content-Type": "application/json" },
-    });
+    const r = await fetch(`${PRINTFUL_BASE}/products`, { headers: authHeaders() });
     const data = await r.json();
     const catalogArray = Array.isArray(data) ? data : (data.result || []);
     res.status(200).json(catalogArray);
