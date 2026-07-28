@@ -81,7 +81,9 @@ app.get("/api/catalog", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
-  const r = await fetch(`${PRINTFUL_BASE}/products`, { headers: authHeaders() });
+  const r = await fetch(`${PRINTFUL_BASE}/products`, {
+    headers: { Authorization: `Bearer ${process.env.PRINTFUL_API_KEY}`, "Content-Type": "application/json" },
+  });
   res.status(r.status).json(await r.json());
 });
 
