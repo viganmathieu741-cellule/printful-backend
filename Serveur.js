@@ -13,14 +13,29 @@ app.use(
 
 const PRINTFUL_BASE = "https://api.printful.com";
 
-// Correction : Lecture dynamique de la clé à chaque appel pour éviter qu'elle soit vide au démarrage
+// Lecture dynamique de la clé + ajout du store_id (requis par l'API Printful)
 function authHeaders() {
   const apiKey = process.env.PRINTFUL_API_KEY;
-  return {
+  const headers = {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
   };
+  if (process.env.PRINTFUL_STORE_ID) {
+    headers["X-PF-Store-Id"] = process.env.PRINTFUL_STORE_ID;
+  }
+  return headers;
 }
+
+// Liste tes boutiques Printful et leurs IDs — utile pour récupérer PRINTFUL_STORE_ID
+app.get("/api/stores", async (req, res) => {
+  if (!process.env.PRINTFUL_API_KEY) {
+    return res.status(500).json({ error: "PRINTFUL_API_KEY manquante sur le serveur" });
+  }
+  const r = await fetch(`${PRINTFUL_BASE}/stores`, {
+    headers: { Authorization: `Bearer ${process.env.PRINTFUL_API_KEY}`, "Content-Type": "application/json" },
+  });
+  res.status(r.status).json(await r.json());
+});
 
 app.get("/api/products", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
@@ -120,13 +135,13 @@ app.post("/api/generate-image", async (req, res) => {
 
 app.post("/api/generate-marketing", async (req, res) => {
   const { product, audience } = req.body;
-  
+
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ error: "GROQ_API_KEY manquante sur le serveur" });
   }
 
   const systemPrompt = "Tu es un stratège en publicité e-commerce spécialisé en print-on-demand (Printful) qui vend au Bénin/Afrique de l'Ouest et à l'international. Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte autour, avec la structure exacte demandée.";
-  
+
   const userPrompt = `Produit à vendre: ${product}
 Audience visée: ${audience || "à définir toi-même selon le produit"}
 
@@ -168,7 +183,7 @@ Structure JSON attendue:
 
     const text = (data.choices?.[0]?.message?.content || "").trim();
     const clean = text.replace(/```json|```/g, "").trim();
-    
+
     try {
       const parsed = JSON.parse(clean);
       res.status(200).json(parsed);
