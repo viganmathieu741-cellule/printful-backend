@@ -41,8 +41,14 @@ app.get("/api/products", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
-  const r = await fetch(`${PRINTFUL_BASE}/store/products`, { headers: authHeaders() });
-  res.status(r.status).json(await r.json());
+  try {
+    const r = await fetch(`${PRINTFUL_BASE}/store/products`, { headers: authHeaders() });
+    const data = await r.json();
+    const productsArray = Array.isArray(data) ? data : (data.result || []);
+    res.status(200).json(productsArray);
+  } catch (e) {
+    res.status(500).json({ error: "products-fetch-failed" });
+  }
 });
 
 app.post("/api/products", async (req, res) => {
@@ -81,10 +87,16 @@ app.get("/api/catalog", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
   }
-  const r = await fetch(`${PRINTFUL_BASE}/products`, {
-    headers: { Authorization: `Bearer ${process.env.PRINTFUL_API_KEY}`, "Content-Type": "application/json" },
-  });
-  res.status(r.status).json(await r.json());
+  try {
+    const r = await fetch(`${PRINTFUL_BASE}/products`, {
+      headers: { Authorization: `Bearer ${process.env.PRINTFUL_API_KEY}`, "Content-Type": "application/json" },
+    });
+    const data = await r.json();
+    const catalogArray = Array.isArray(data) ? data : (data.result || []);
+    res.status(200).json(catalogArray);
+  } catch (e) {
+    res.status(500).json({ error: "catalog-fetch-failed" });
+  }
 });
 
 app.post("/api/kkiapay/verify", async (req, res) => {
