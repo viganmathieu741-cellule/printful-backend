@@ -78,6 +78,19 @@ app.post("/api/products", async (req, res) => {
   }
 });
 
+app.get("/api/products/:id", async (req, res) => {
+  if (!process.env.PRINTFUL_API_KEY) {
+    return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
+  }
+  try {
+    const r = await fetch(`${PRINTFUL_BASE}/store/products/${req.params.id}`, { headers: storeHeaders() });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (e) {
+    res.status(500).json({ error: "product-detail-fetch-failed" });
+  }
+});
+
 app.get("/api/orders", async (req, res) => {
   if (!process.env.PRINTFUL_API_KEY) {
     return res.status(500).json({ error: "Erreur — vérifie que PRINTFUL_API_KEY est configurée sur ton serveur relais." });
