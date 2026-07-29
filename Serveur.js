@@ -142,13 +142,68 @@ app.post("/api/kkiapay/verify", async (req, res) => {
     });
     const data = await r.json();
     res.status(r.status).json(data);
+
+    // Si le paiement est confirmé, on déclenche la commande Printful automatiquement
+    if (data && data.status === "SUCCESS") {
+      await createPrintfulOrderFromTransaction(data);
+    }
   } catch (e) {
     res.status(500).json({ error: "verification-failed" });
   }
 });
 
+// Crée une vraie commande Printful (fabrication + expédition) à partir des infos de la transaction Kkiapay
+async function createPrintfulOrderFromTransaction(transactionData) {
+  try {
+    let custom = {};
+    try {
+      custom = JSON.parse(transactionData.data || "{}");
+    } catch (e) {
+      custom = {};
+    }
+    if (!custom.printfulVariantId || !custom.recipient) {
+      console.log("Commande auto ignorée — infos produit/adresse manquantes dans la transaction Kkiapay.");
+      return;
+    }
+    const orderPayload = {
+      recipient: {
+        name: custom.recipient.name,
+        address1: custom.recipient.address1,
+        city: custom.recipient.city,
+        country_code: custom.recipient.country_code || "BJ",
+        zip: custom.recipient.zip || "00000",
+        phone: custom.recipient.phone || "",
+      },
+      items: [
+        {
+          variant_id: custom.printfulVariantId,
+          quantity: 1,
+          retail_price: custom.retailPrice || "0.00",
+        },
+      ],
+      confirm: true, // true = commande envoyée directement en fabrication chez Printful
+    };
+    const r = await fetch(`${PRINTFUL_BASE}/orders`, {
+      method: "POST",
+      headers: storeHeaders(),
+      body: JSON.stringify(orderPayload),
+    });
+    const result = await r.json();
+    console.log("Commande Printful créée automatiquement:", r.status, JSON.stringify(result));
+  } catch (e) {
+    console.log("Erreur création commande Printful automatique:", e.message);
+  }
+}
+
 app.post("/api/kkiapay/webhook", express.json(), async (req, res) => {
   console.log("Webhook Kkiapay reçu:", req.body);
+  try {
+    if (req.body && (req.body.status === "SUCCESS" || req.body.event === "transaction.success")) {
+      await createPrintfulOrderFromTransaction(req.body);
+    }
+  } catch (e) {
+    console.log("Erreur webhook:", e.message);
+  }
   res.sendStatus(200);
 });
 
